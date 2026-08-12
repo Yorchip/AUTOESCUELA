@@ -88,15 +88,15 @@ def update_statistics(pregunta_data, correcto):
 def get_available_topics():
     if not DATOS_DIR.exists():
         return []
-    archivos = list(DATOS_DIR.glob('*.xlsx')) + list(DATOS_DIR.glob('*.csv'))
-    temas = [archivo.stem for archivo in archivos]
-    return sorted(temas)
+    archivos = list(DATOS_DIR.glob('*.xlsx')) + list(DATOS_DIR.glob('*.csv')) + list(DATOS_DIR.glob('*.XLSX')) + list(DATOS_DIR.glob('*.CSV'))
+    temas = sorted(list(set([archivo.stem for archivo in archivos])))
+    return temas
 
 def load_questions_from_file(archivo):
     preguntas = []
     tema_nombre = archivo.stem
     try:
-        if archivo.suffix == '.xlsx':
+        if archivo.suffix.lower() == '.xlsx':
             df = pd.read_excel(archivo)
         else:
             for sep in [',', ';', '\t']:
@@ -111,9 +111,10 @@ def load_questions_from_file(archivo):
                     continue
                 break
             else:
+                st.warning(f"No se pudo determinar el formato del CSV: {archivo.name}")
                 return []
         
-        df.columns = [col.strip() for col in df.columns]
+        df.columns = [str(col).strip() for col in df.columns]
         column_mapping = {}
         for col in df.columns:
             col_lower = col.lower().replace('ó', 'o').replace('í', 'i').replace('é', 'e')
@@ -154,46 +155,45 @@ def load_questions_from_file(archivo):
         imagen_col = column_mapping.get('imagen')
 
         if not pregunta_col:
+            st.warning(f"⚠️ El archivo '{archivo.name}' se abrió pero no tiene una columna llamada 'Pregunta'. Columnas encontradas: {list(df.columns)}")
             return []
 
         for _, fila in df.iterrows():
-            try:
-                if pd.isna(fila[pregunta_col]) or str(fila[pregunta_col]).strip() == '':
-                    continue
-                
-                opciones = []
-                for i, col in enumerate(opciones_cols):
-                    if col and col in df.columns and not pd.isna(fila[col]):
-                        opciones.append(str(fila[col]).strip())
-                    else:
-                        opciones.append(f'Opción {chr(65+i)} (no definida)')
-                
-                while len(opciones) < 3:
-                    opciones.append(f'Opción {chr(65+len(opciones))} (no definida)')
-                
-                correcta = 'A'
-                if correcta_col and correcta_col in df.columns and not pd.isna(fila[correcta_col]):
-                    correcta_raw = str(fila[correcta_col]).upper().strip()
-                    if correcta_raw in ['A', 'B', 'C']:
-                        correcta = correcta_raw
-                    elif correcta_raw in ['1', '2', '3']:
-                        correcta = chr(64 + int(correcta_raw))
-                
-                img_path = None
-                if imagen_col and imagen_col in df.columns and not pd.isna(fila[imagen_col]):
-                    img_path = str(fila[imagen_col]).strip()
-
-                preguntas.append({
-                    'tema': tema_nombre,
-                    'pregunta': str(fila[pregunta_col]).strip(),
-                    'opciones': opciones[:3],
-                    'correcta': correcta,
-                    'imagen': img_path
-                })
-            except Exception as e:
+            if pd.isna(fila[pregunta_col]) or str(fila[pregunta_col]).strip() == '':
                 continue
+            
+            opciones = []
+            for i, col in enumerate(opciones_cols):
+                if col and col in df.columns and not pd.isna(fila[col]):
+                    opciones.append(str(fila[col]).strip())
+                else:
+                    opciones.append(f'Opción {chr(65+i)} (no definida)')
+            
+            while len(opciones) < 3:
+                opciones.append(f'Opción {chr(65+len(opciones))} (no definida)')
+            
+            correcta = 'A'
+            if correcta_col and correcta_col in df.columns and not pd.isna(fila[correcta_col]):
+                correcta_raw = str(fila[correcta_col]).upper().strip()
+                if correcta_raw in ['A', 'B', 'C']:
+                    correcta = correcta_raw
+                elif correcta_raw in ['1', '2', '3']:
+                    correcta = chr(64 + int(correcta_raw))
+            
+            img_path = None
+            if imagen_col and imagen_col in df.columns and not pd.isna(fila[imagen_col]):
+                img_path = str(fila[imagen_col]).strip()
+
+            preguntas.append({
+                'tema': tema_nombre,
+                'pregunta': str(fila[pregunta_col]).strip(),
+                'opciones': opciones[:3],
+                'correcta': correcta,
+                'imagen': img_path
+            })
     except Exception as e:
-        pass
+        st.error(f"Error cargando el archivo {archivo.name}: {e}")
+        
     return preguntas
 
 def load_questions(tema=None):
@@ -201,18 +201,18 @@ def load_questions(tema=None):
         return []
     todas_preguntas = []
     if tema:
-        for extension in ['.xlsx', '.csv']:
+        for extension in ['.xlsx', '.csv', '.XLSX', '.CSV']:
             archivo = DATOS_DIR / f"{tema}{extension}"
             if archivo.exists():
                 todas_preguntas.extend(load_questions_from_file(archivo))
                 break
     else:
-        archivos = list(DATOS_DIR.glob('*.xlsx')) + list(DATOS_DIR.glob('*.csv'))
+        archivos = list(DATOS_DIR.glob('*.xlsx')) + list(DATOS_DIR.glob('*.csv')) + list(DATOS_DIR.glob('*.XLSX')) + list(DATOS_DIR.glob('*.CSV'))
         for archivo in archivos:
             todas_preguntas.extend(load_questions_from_file(archivo))
     return todas_preguntas
 
-# --- ESTADOS DE LA SESIÓN DE STREAMLIT ---
+# --- ESTADOS DE LA SESIÓN ---
 if 'view' not in st.session_state:
     st.session_state.view = 'home'
 if 'exam_questions' not in st.session_state:
@@ -224,7 +224,7 @@ if 'user_answers' not in st.session_state:
 if 'exam_title' not in st.session_state:
     st.session_state.exam_title = ""
 
-# --- NAVEGACIÓN PRINCIPAL ---
+# --- NAVEGACIÓN ---
 st.title("📚 Sistema de Exámenes Profesional")
 
 with st.sidebar:
@@ -236,7 +236,7 @@ with st.sidebar:
         st.session_state.view = 'stats'
         st.rerun()
 
-# --- VISTA: INICIO / CONFIGURACIÓN DE EXAMEN ---
+# --- VISTA: INICIO Y CONFIGURACIÓN ---
 if st.session_state.view == 'home':
     st.subheader("Selecciona el tipo de examen")
     
@@ -250,7 +250,7 @@ if st.session_state.view == 'home':
     titulo_examen = ""
 
     if not temas:
-        st.warning("⚠️ No se encontraron archivos de preguntas en la carpeta 'datos/'. Por favor, sube archivos Excel o CSV.")
+        st.error("❌ No se encontraron archivos en la carpeta 'datos/'. Asegúrate de que la carpeta existe en GitHub y contiene archivos Excel (.xlsx) o CSV.")
     else:
         if opciones_examen == "📖 Examen por Tema Específico":
             tema_sel = st.selectbox("Selecciona un tema:", temas)
@@ -287,9 +287,9 @@ if st.session_state.view == 'home':
                         break
             titulo_examen = "Preguntas más Falladas"
 
+        st.divider()
         if preguntas_seleccionadas:
-            st.divider()
-            st.write(f"**Preguntas disponibles:** {len(preguntas_seleccionadas)}")
+            st.success(f"✅ Preguntas cargadas correctamente: **{len(preguntas_seleccionadas)}**")
             
             col1, col2 = st.columns(2)
             with col1:
@@ -307,8 +307,10 @@ if st.session_state.view == 'home':
                 st.session_state.exam_title = titulo_examen
                 st.session_state.view = 'exam'
                 st.rerun()
+        else:
+            st.info("💡 Por favor, selecciona las opciones anteriores para cargar las preguntas.")
 
-# --- VISTA: EJECUCIÓN DEL EXAMEN ---
+# --- VISTA: EXAMEN ---
 elif st.session_state.view == 'exam':
     idx = st.session_state.current_index
     questions = st.session_state.exam_questions
@@ -319,7 +321,6 @@ elif st.session_state.view == 'exam':
 
     st.markdown(f"### ❓ {q_curr['pregunta']}")
 
-    # Mostrar Imagen si existe en la carpeta /imagenes
     if q_curr.get('imagen'):
         img_file = IMAGENES_DIR / str(q_curr['imagen'])
         if img_file.exists():
@@ -345,7 +346,6 @@ elif st.session_state.view == 'exam':
         chosen_letter = options_map[selected_option]
         st.session_state.user_answers[idx] = chosen_letter
         
-        # Feedback Inmediato
         if chosen_letter == q_curr['correcta']:
             st.success("✅ ¡Correcto!")
         else:
