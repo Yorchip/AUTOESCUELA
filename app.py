@@ -1,3 +1,13 @@
+import sys
+import subprocess
+
+# Instalar automáticamente openpyxl si no está presente en el servidor
+try:
+    import openpyxl
+except ImportError:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "openpyxl"])
+    import openpyxl
+
 import streamlit as st
 import pandas as pd
 import random
@@ -321,7 +331,7 @@ elif st.session_state.view == 'exam':
 
     st.markdown(f"### ❓ {q_curr['pregunta']}")
 
-if q_curr.get('imagen'):
+    if q_curr.get('imagen'):
         raw_img = str(q_curr['imagen']).strip().replace('\\', '/')
         
         # Elimina 'imagenes/' si ya viene escrito en el Excel
@@ -332,11 +342,10 @@ if q_curr.get('imagen'):
             
         img_file = IMAGENES_DIR / nombre_limpio
         
-        # 1. Búsqueda directa
+        # Búsqueda directa o insensible a mayúsculas
         if img_file.exists():
             st.image(str(img_file), use_container_width=True)
         else:
-            # 2. Búsqueda tolerable a mayúsculas/minúsculas para servidores Linux
             encontrada = False
             if IMAGENES_DIR.exists():
                 for f in IMAGENES_DIR.iterdir():
@@ -345,7 +354,7 @@ if q_curr.get('imagen'):
                         encontrada = True
                         break
             if not encontrada:
-                st.warning(f"⚠️ No se encontró la imagen: '{nombre_limpio}' dentro de la carpeta 'imagenes/'.")    
+                st.warning(f"⚠️ No se encontró la imagen: '{nombre_limpio}' dentro de la carpeta 'imagenes/'.")
 
     options_map = {f"{chr(65+i)}) {opt}": chr(65+i) for i, opt in enumerate(q_curr['opciones'])}
     
