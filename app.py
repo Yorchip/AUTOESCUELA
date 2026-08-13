@@ -14,7 +14,6 @@ import random
 from pathlib import Path
 import os
 import io
-from github import Github
 
 # Configuración de página
 st.set_page_config(
@@ -70,12 +69,13 @@ def save_statistics(estadisticas):
         if not df.empty:
             df = df.sort_values(['porcentaje_fallos', 'fallos'], ascending=[False, False])
         
-        # 1. Guardar localmente
+        # 1. Guardar localmente en el servidor
         with pd.ExcelWriter(ESTADISTICAS_FILE, engine='openpyxl') as writer:
             df.to_excel(writer, sheet_name='Estadisticas', index=False)
         
         # 2. Guardar en GitHub de forma permanente
         if "GITHUB_TOKEN" in st.secrets:
+            from github import Github, GithubException
             token = st.secrets["GITHUB_TOKEN"]
             g = Github(token)
             repo = g.get_repo("Yorchip/AUTOESCUELA")
@@ -88,6 +88,7 @@ def save_statistics(estadisticas):
             file_path = "estadisticas.xlsx"
             
             try:
+                # Obtener el archivo existente y su SHA actual para actualizarlo
                 contents = repo.get_contents(file_path)
                 repo.update_file(
                     path=file_path,
@@ -95,12 +96,16 @@ def save_statistics(estadisticas):
                     content=content_bytes,
                     sha=contents.sha
                 )
-            except Exception:
-                repo.create_file(
-                    path=file_path,
-                    message="📊 Creación automática de estadísticas",
-                    content=content_bytes
-                )
+            except GithubException as ge:
+                if ge.status == 404:
+                    # Crear el archivo solo si realmente no existe en GitHub
+                    repo.create_file(
+                        path=file_path,
+                        message="📊 Creación automática de estadísticas",
+                        content=content_bytes
+                    )
+                else:
+                    st.error(f"Error al actualizar estadísticas en GitHub: {ge}")
     except Exception as e:
         st.error(f"Error al guardar estadísticas: {e}")
 
@@ -365,6 +370,7 @@ elif st.session_state.view == 'exam':
     if q_curr.get('imagen'):
         raw_img = str(q_curr['imagen']).strip().replace('\\', '/')
         
+        # Elimina 'imagenes/' si viene escrito en el Excel
         if raw_img.lower().startswith('imagenes/'):
             nombre_limpio = raw_img[9:]
         else:
@@ -372,6 +378,7 @@ elif st.session_state.view == 'exam':
             
         img_file = IMAGENES_DIR / nombre_limpio
         
+        # Búsqueda directa o insensible a mayúsculas
         if img_file.exists():
             st.image(str(img_file), use_container_width=True)
         else:
