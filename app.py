@@ -344,7 +344,6 @@ if st.session_state.view == 'home':
             stats = load_statistics()
             failed_questions = []
             for key, stat in stats.items():
-                # Filtro: debe tener al menos 1 fallo Y haber sido acertada MENOS de 3 veces seguidas
                 if stat['fallos'] > 0 and stat.get('aciertos_consecutivos', 0) < 3:
                     failed_questions.append(stat)
             
@@ -475,20 +474,20 @@ elif st.session_state.view == 'results':
         update_statistics(q, is_corr)
 
     total = len(questions)
+    fallos = total - correct_count
     percentage = (correct_count / total) * 100 if total > 0 else 0
 
     c1, c2, c3 = st.columns(3)
     c1.metric("Aciertos", f"{correct_count} / {total}")
-    c2.metric("Fallos", f"{total - correct_count}")
-    c3.metric("Porcentaje", f"{percentage:.1f}%")
+    c2.metric("Fallos", f"{fallos}")
+    c3.metric("Porcentaje Aciertos", f"{percentage:.1f}%")
 
-    if percentage >= 80:
+    # Regla: Apto sólo si los fallos son <= 10% del total de preguntas (90% o más de aciertos)
+    if percentage >= 90:
         st.balloons()
-        st.success("🎉 ¡Excelente resultado!")
-    elif percentage >= 50:
-        st.info("👍 Buen trabajo, pero puedes seguir repasando.")
+        st.success("🎉 ¡APTO! Has aprobado el examen (máximo 10% de fallos).")
     else:
-        st.error("📖 Necesitas estudiar más este tema.")
+        st.error("❌ NO APTO. Has superado el 10% de fallos permitidos. Necesitas repasar más.")
 
     st.divider()
     st.markdown("### Detalle de respuestas")
