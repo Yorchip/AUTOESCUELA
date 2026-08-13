@@ -23,6 +23,20 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Estilo CSS para ajustar imágenes de forma responsive (PC y Móvil)
+st.markdown("""
+    <style>
+    div[data-testid="stImage"] img {
+        max-height: 300px; /* Limita la altura en monitor para ver pregunta y respuestas sin scroll */
+        width: auto; /* Ancho proporcional */
+        max-width: 100%; /* Adapta el ancho al móvil sin salirse de la pantalla */
+        object-fit: contain; /* Evita que la imagen se recorte o deforme */
+        margin: 0 auto; /* Centra la imagen */
+        display: block;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 ESTADISTICAS_FILE = 'estadisticas.xlsx'
 DATOS_DIR = Path('datos')
 IMAGENES_DIR = Path('imagenes')
