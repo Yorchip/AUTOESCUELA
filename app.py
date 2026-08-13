@@ -1,18 +1,20 @@
 import sys
 import subprocess
 
-# Instalar automáticamente openpyxl si no está presente en el servidor
-try:
-    import openpyxl
-except ImportError:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "openpyxl"])
-    import openpyxl
+# Instalar automáticamente librerías requeridas si no están presentes
+for pkg in ["openpyxl", "PyGithub"]:
+    try:
+        __import__(pkg if pkg != "PyGithub" else "github")
+    except ImportError:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", pkg])
 
 import streamlit as st
 import pandas as pd
 import random
 from pathlib import Path
 import os
+import io
+from github import Github
 
 # Configuración de página
 st.set_page_config(
@@ -68,8 +70,37 @@ def save_statistics(estadisticas):
         if not df.empty:
             df = df.sort_values(['porcentaje_fallos', 'fallos'], ascending=[False, False])
         
+        # 1. Guardar localmente
         with pd.ExcelWriter(ESTADISTICAS_FILE, engine='openpyxl') as writer:
             df.to_excel(writer, sheet_name='Estadisticas', index=False)
+        
+        # 2. Guardar en GitHub de forma permanente
+        if "GITHUB_TOKEN" in st.secrets:
+            token = st.secrets["GITHUB_TOKEN"]
+            g = Github(token)
+            repo = g.get_repo("Yorchip/AUTOESCUELA")
+            
+            buffer = io.BytesIO()
+            with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+                df.to_excel(writer, sheet_name='Estadisticas', index=False)
+            
+            content_bytes = buffer.getvalue()
+            file_path = "estadisticas.xlsx"
+            
+            try:
+                contents = repo.get_contents(file_path)
+                repo.update_file(
+                    path=file_path,
+                    message="📊 Actualización automática de estadísticas",
+                    content=content_bytes,
+                    sha=contents.sha
+                )
+            except Exception:
+                repo.create_file(
+                    path=file_path,
+                    message="📊 Creación automática de estadísticas",
+                    content=content_bytes
+                )
     except Exception as e:
         st.error(f"Error al guardar estadísticas: {e}")
 
@@ -334,7 +365,6 @@ elif st.session_state.view == 'exam':
     if q_curr.get('imagen'):
         raw_img = str(q_curr['imagen']).strip().replace('\\', '/')
         
-        # Elimina 'imagenes/' si ya viene escrito en el Excel
         if raw_img.lower().startswith('imagenes/'):
             nombre_limpio = raw_img[9:]
         else:
@@ -342,7 +372,6 @@ elif st.session_state.view == 'exam':
             
         img_file = IMAGENES_DIR / nombre_limpio
         
-        # Búsqueda directa o insensible a mayúsculas
         if img_file.exists():
             st.image(str(img_file), use_container_width=True)
         else:
