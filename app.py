@@ -36,11 +36,11 @@ st.markdown("""
         display: block;
     }
 
-    /* Aumenta el tamaño del texto de las opciones de respuesta (st.radio) */
+    /* Aumenta el tamaño del texto de las opciones de respuesta */
     div[data-testid="stRadio"] p {
-        font-size: 1.2rem !important; /* Puedes cambiar 1.2rem por 1.3rem o 20px si lo quieres aún más grande */
-        font-weight: 500; /* Le da un toque ligeramente más legible */
-        line-height: 1.5; /* Mejora la separación entre líneas */
+        font-size: 1.2rem !important;
+        font-weight: 500;
+        line-height: 1.5;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -63,7 +63,8 @@ def load_statistics():
                     'pregunta': fila['pregunta_completa'],
                     'intentos': int(fila['intentos']),
                     'aciertos': int(fila['aciertos']),
-                    'fallos': int(fila['fallos'])
+                    'fallos': int(fila['fallos']),
+                    'aciertos_consecutivos': int(fila['aciertos_consecutivos']) if 'aciertos_consecutivos' in fila and not pd.isna(fila['aciertos_consecutivos']) else 0
                 }
             return estadisticas
         except Exception as e:
@@ -83,6 +84,7 @@ def save_statistics(estadisticas):
                 'intentos': stats['intentos'],
                 'aciertos': stats['aciertos'],
                 'fallos': stats['fallos'],
+                'aciertos_consecutivos': stats.get('aciertos_consecutivos', 0),
                 'porcentaje_fallos': round((stats['fallos'] / stats['intentos']) * 100, 1) if stats['intentos'] > 0 else 0,
                 'porcentaje_aciertos': round((stats['aciertos'] / stats['intentos']) * 100, 1) if stats['intentos'] > 0 else 0
             })
@@ -110,7 +112,6 @@ def save_statistics(estadisticas):
             file_path = "estadisticas.xlsx"
             
             try:
-                # Obtener el archivo existente y su SHA actual para actualizarlo
                 contents = repo.get_contents(file_path)
                 repo.update_file(
                     path=file_path,
@@ -120,7 +121,6 @@ def save_statistics(estadisticas):
                 )
             except GithubException as ge:
                 if ge.status == 404:
-                    # Crear el archivo solo si realmente no existe en GitHub
                     repo.create_file(
                         path=file_path,
                         message="📊 Creación automática de estadísticas",
@@ -142,14 +142,17 @@ def update_statistics(pregunta_data, correcto):
             'pregunta': pregunta_data['pregunta'],
             'intentos': 0,
             'aciertos': 0,
-            'fallos': 0
+            'fallos': 0,
+            'aciertos_consecutivos': 0
         }
     
     estadisticas[clave]['intentos'] += 1
     if correcto:
         estadisticas[clave]['aciertos'] += 1
+        estadisticas[clave]['aciertos_consecutivos'] = estadisticas[clave].get('aciertos_consecutivos', 0) + 1
     else:
         estadisticas[clave]['fallos'] += 1
+        estadisticas[clave]['aciertos_consecutivos'] = 0  # Reinicia la racha si falla
     
     save_statistics(estadisticas)
 
@@ -341,7 +344,8 @@ if st.session_state.view == 'home':
             stats = load_statistics()
             failed_questions = []
             for key, stat in stats.items():
-                if stat['intentos'] >= 2 and stat['fallos'] > 0:
+                # Filtro: debe tener al menos 1 fallo Y haber sido acertada MENOS de 3 veces seguidas
+                if stat['fallos'] > 0 and stat.get('aciertos_consecutivos', 0) < 3:
                     failed_questions.append(stat)
             
             failed_questions.sort(key=lambda x: (x['fallos'] / x['intentos']), reverse=True)
@@ -392,7 +396,6 @@ elif st.session_state.view == 'exam':
     if q_curr.get('imagen'):
         raw_img = str(q_curr['imagen']).strip().replace('\\', '/')
         
-        # Elimina 'imagenes/' si viene escrito en el Excel
         if raw_img.lower().startswith('imagenes/'):
             nombre_limpio = raw_img[9:]
         else:
@@ -400,7 +403,6 @@ elif st.session_state.view == 'exam':
             
         img_file = IMAGENES_DIR / nombre_limpio
         
-        # Búsqueda directa o insensible a mayúsculas
         if img_file.exists():
             st.image(str(img_file), use_container_width=True)
         else:
@@ -512,4 +514,4 @@ elif st.session_state.view == 'stats':
         st.info("Aún no hay estadísticas registradas. Completa algunos exámenes para ver los datos aquí.")
     else:
         df = pd.DataFrame(stats.values())
-        st.dataframe(df[['tema', 'pregunta', 'intentos', 'aciertos', 'fallos']], use_container_width=True)
+        st.dataframe(df[['tema', 'pregunta', 'intentos', 'aciertos', 'fallos', 'aciertos_consecutivos']], use_container_width=True)
