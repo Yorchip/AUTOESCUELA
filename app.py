@@ -23,16 +23,24 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilo CSS para ajustar imágenes de forma responsive (PC y Móvil)
+# Estilo CSS para imágenes responsive y letra más grande en las respuestas
 st.markdown("""
     <style>
+    /* Ajuste responsive para las imágenes */
     div[data-testid="stImage"] img {
-        max-height: 300px; /* Limita la altura en monitor para ver pregunta y respuestas sin scroll */
-        width: auto; /* Ancho proporcional */
-        max-width: 100%; /* Adapta el ancho al móvil sin salirse de la pantalla */
-        object-fit: contain; /* Evita que la imagen se recorte o deforme */
-        margin: 0 auto; /* Centra la imagen */
+        max-height: 300px;
+        width: auto;
+        max-width: 100%;
+        object-fit: contain;
+        margin: 0 auto;
         display: block;
+    }
+
+    /* Aumenta el tamaño del texto de las opciones de respuesta (st.radio) */
+    div[data-testid="stRadio"] p {
+        font-size: 1.2rem !important; /* Puedes cambiar 1.2rem por 1.3rem o 20px si lo quieres aún más grande */
+        font-weight: 500; /* Le da un toque ligeramente más legible */
+        line-height: 1.5; /* Mejora la separación entre líneas */
     }
     </style>
 """, unsafe_allow_html=True)
