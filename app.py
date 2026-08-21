@@ -18,7 +18,7 @@ import io
 
 # Configuración de página
 st.set_page_config(
-    page_title="Sistema de Exámenes Profesional",
+    page_title="AUTOESCUELA DGT 2026",
     page_icon="📚",
     layout="wide",
     initial_sidebar_state="expanded"
